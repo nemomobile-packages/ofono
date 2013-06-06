@@ -1,0 +1,356 @@
+ofono (1.12phablet3) UNRELEASED; urgency=low
+
+  * Adding test and maintenance scripts ofono-scripts binary package.
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Thu, 30 May 2013 17:10:33 -0300
+
+ofono (1.12phablet2) raring; urgency=low
+
+  [ Tony Espy ]
+  * [ril/rilmodem] Initial SIM support, includes:
+   - read filesystem support
+   - proper modem initialization
+
+  [ Sergio Schvezov ]
+  * [ril/rilmodem] Using pdu field to figure out SMSC length (LP: #1090437).
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Wed, 29 May 2013 23:52:33 -0300
+
+ofono (1.12phablet1) raring; urgency=low
+
+  [ Ricardo Salveti de Araujo ]
+  * ofono.upstart: not starting with debug by default, not needed anymore
+  * drivers/rilmodem/devinfo.c: fake data should just use Fake instead of
+    Galaxy Nexus
+  * Fixing audio states during and after a call, previously broken with
+    JellyBean (LP: #1101339)
+  * parcel.c: fixing data padding boundary for parcel_w_string (LP: #1088559)
+  * Only setting audio mode in call when actually dialing or answering (to
+    allow ringtones at the ubuntu side)
+  * Adding proper support for network registration and network state changes
+  * Support registering for network time update reports
+  * Extending network registration to support current operator, list of
+    operators and auto/manual registration
+  * Enabling support to retrieve the signal strength
+  * Enabling initial support for DTMF
+  * Adding support for answering a call
+  * Tuning start sleep for 8 and running with debug messages enabled
+  * Sync ril_delayed_register timeout to 2 for all services in rilmodem
+  * Setting up voice state and enabling voice call support at AudioFlinger
+  * Adding support for voice call (LP: #1085893)
+  * Adding utils files for parcel and string handling
+  * Enable basic support for voice volume (mute/unmute)
+
+  [ Tony Espy ]
+  * gril/*, plugins/ril.c, drivers/rilmodem/*: fixed copyright headers,
+    sanitized comments.
+  * Re-named the galaxynexus plugin to ril.
+  * [galaxynexus] Add SIM checking to modem initialization.
+  * [gril] Add ril_request_id_to_string function.
+  * [core] Modify ofono_modem_set_online() to call modem_change_state(),
+    which triggers our new modem initialization logic in galaxynexus'
+    post_online function.
+  * Disable atmodem plugin on starup.
+  * Initial version of notification framework for RIL
+    unsolicited events ( signal strength, new sms, ... ).
+  * Support for incoming SMS messages (LP: #1085896).
+  * First hard-coded support for RIL modem on Galaxy Nexus.
+  * Initial phablet version, converted to native for
+    easier development of new RIL driver/plugin code.
+    - debian/source/format: changed to 3.0 (native)
+    - .pc: removed
+
+  [ Michael Frey ]
+  * debian/ofono.upstart: Fix for hang on shutdown.
+
+ -- Ricardo Salveti de Araujo <ricardo.salveti@canonical.com>  Wed, 10 Apr 2013 22:23:42 -0300
+
+ofono (1.12-0ubuntu2b1) raring; urgency=low
+
+  * No-change rebuild against libudev1
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 13 Mar 2013 07:07:59 +0000
+
+ofono (1.12-0ubuntu2) raring; urgency=low
+
+  * Add missing include of sys/types.h in src/storage.h to fix FTBFS.
+
+ -- Stéphane Graber <stgraber@ubuntu.com>  Mon, 28 Jan 2013 15:29:38 -0500
+
+ofono (1.12-0ubuntu1) raring; urgency=low
+
+  * New upstream release. (1.12)
+    - 1.12:
+      + Fix issue with alpha ID and self explanatory icons.
+      + Fix issue with SIM Refresh handling and resetting state.
+      + Fix issue with SMS initiated by STK proactive command.
+      + Fix issue with CBS treating carriage return as padding.
+      + Fix issue with USSD terminated by network notification.
+      + Add support for battery charge level with Handsfree devices.
+      + Add support for technology and band changes with IFX modems.
+      + Add support for SIM file handling with Qualcomm QMI modems.
+      + Add support for SIM file system 2G and 3G path handling.
+      + Add support for SIM Toolkit end-to-end testing.
+    - 1.11:
+      + Fix issue with Bluetooth disconnect handling.
+      + Fix issue with handling EFspn with filler characters.
+      + Fix issue with processing multiple *EMRDY notifications.
+      + Fix issue with wrong data bearer property signal.
+      + Add support for data bearer reporting and Telit modems.
+      + Add support for SIM status notification and Telit modems.
+      + Add support for PIN retry counter status and Telit modems.
+      + Add support for long phone number format and SIM Toolkit.
+      + Add support for RequestQuickDigit to SIM Toolkit agent.
+    - 1.10:
+      + Update multiple descriptions of the API documentation.
+      + Add support for ReleaseAndSwap call handling.
+
+ -- Stéphane Graber <stgraber@ubuntu.com>  Mon, 28 Jan 2013 14:07:46 -0500
+
+ofono (1.9-1ubuntu1) quantal; urgency=low
+
+  * Merge with Debian experimental; remaining changes:
+    - debian/control: explicitly Conflicts with modemmanager: having both
+      installed / running at the same time causes issues causes issues with
+      both claiming modem devices.
+    - debian/patches/02-dont-handle-stacktraces.patch: stop catching stacktraces
+      and printing the information internally, so apport can catch and report
+      the possible bugs.
+    - debian/ofono.postinst: on configure, notify the user that a reboot is
+      required (so ofono can get started by upstart). (LP: #600501)
+    - debian/rules: pass --no-restart-on-upgrade so ofono isn't automatically
+      restarted when upgrades.
+    - Adding upstart config / Removing standard init script
+    - Adding Apport support
+    - Patch for recognizing special Huawei devices with weird serial
+    - Override lintian to avoid script-in-etc-init.d... warnings.
+    - Update debian/compat to 7
+  * debian/series: add our patches to debian/patches/series now that the package
+    uses quilt.
+  * debian/patches/02-dont-handle-stacktraces.patch: refreshed.
+  * debian/ofono-dev.install, debian/ofono.install:
+    - Install usr/sbin/dundee and ofono.pc to the proper packages.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Wed, 22 Aug 2012 19:59:08 -0400
+
+ofono (1.9-1) experimental; urgency=low
+
+  * New upstream release
+
+ -- Konstantinos Margaritis <markos@debian.org>  Tue, 31 Jul 2012 11:00:42 +0300
+
+ofono (1.6-2) unstable; urgency=low
+
+  * Add build dependency on mobile-broadband-provider-info 
+
+ -- Hector Oron <zumbi@debian.org>  Sat, 02 Jun 2012 00:55:18 +0200
+
+ofono (1.6-1) unstable; urgency=low
+
+  * New upstream release.
+  * Add myself to uploaders. 
+  * Update Standards-Version. 
+  * Change source/format to 3.0 (quilt)
+
+ -- Hector Oron <zumbi@debian.org>  Fri, 01 Jun 2012 18:29:37 +0200
+
+ofono (0.53-2) unstable; urgency=low
+
+  * debian/ofono.init: Add dbus as a dependency to start and stop. Thanks
+    to Johannes Schauer for the patch and report. (Closes: #631707)
+
+ -- Jonny Lamb <jonny@debian.org>  Wed, 24 Aug 2011 15:36:44 +0100
+
+ofono (0.53-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/control: Add Vcs-* fields.
+  * Ensure ofono is built with bluetooth support (pass --enable-bluetooth
+    and add libbluetooth-dev build-dep).
+
+ -- Jonny Lamb <jonny@debian.org>  Wed, 24 Aug 2011 14:40:25 +0100
+
+ofono (0.41-0ubuntu1) natty; urgency=low
+
+  * New upstream release.
+  * debian/control: explicitly Conflicts with modemmanager: having both
+    installed / running at the same time causes issues causes issues with both
+    claiming modem devices. (LP: #688472)
+  * debian/patches/02-dont-handle-stacktraces.patch: stop catching stacktraces
+    and printing the information internally, so apport can catch and report
+    the possible bugs. (LP: #691450)
+  * debian/ofono.postinst: on configure, notify the user that a reboot is
+    required (so ofono can get started by upstart). (LP: #600501)
+  * debian/control: add new Build-Depends on libbluetooth-dev to build with
+    bluetooth support.
+  * debian/rules: drop override_dh_strip, not needed for debug symbols with
+    cdbs.
+  * debian/rules: pass --no-restart-on-upgrade so ofono isn't automatically
+    restarted when upgrades.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 21 Feb 2011 15:08:51 +0100
+
+ofono (0.36-1ubuntu1) natty; urgency=low
+
+  * Merge from Debian unstable (LP: #683302), remaining changes:
+    - Adding upstart config and preinst rules
+    - Removing standard init script
+    - Adding Apport support
+    - Patch for recognizing special Huawei devices with weird serial
+    - Bump debhelper build-depend to >= 7.0.50~ for override support
+    - Add a dh_strip override to add debugging symbols to ofono-dbg
+    - Override lintian to avoid script-in-etc-init.d... warnings.
+    - Update debian/compat to 7
+    - Add preinst script to remove old conf file (needed until next LTS)
+  * Refreshed 01-check-that-modem-name-is-valid.patch for new release.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 13 Dec 2010 22:08:29 -0600
+
+ofono (0.36-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/: Added some files relating to building with git.
+  * debian/control:
+    + Adopt the package from Andres. Thanks for your work, dude!
+    + Upped versioned build-dep on glib.
+    + Upped Standards-Version. (no changes)
+  * debinan/ofono.install: Updated.
+  * debian/rules: Switch to cdbs to be like the rest of the pkg-telepathy
+    packages.
+  * debian/ofono.init: Add dependency on $remote_fs in required-start and
+    required-stop.
+  * debian/compat: Lower to 5 for misc reasons.
+  * debian/patches/: Add patch to fix small lintian problem.
+
+ -- Jonny Lamb <jonny@debian.org>  Mon, 29 Nov 2010 18:14:48 +0000
+
+ofono (0.26-0ubuntu2) maverick; urgency=low
+
+  [ Kalle Valo <kalle.valo@canonical.com> ]
+  * Ofono should use upstart (LP: #600503)
+    - add debian/ofono.upstart
+    - add debian/ofono.preinst
+    - remove debian/ofono.init
+    - remote debian/ofono.default
+  * Add Apport support (LP: #600502)
+    - add debian/ofono-crashdb.conf
+    - add debian/source_ofono.py
+  * Fix LP: #612479 - Huawei with invalid serial not recognised
+    - add debian/patches/01-check-that-modem-name-is-valid.patch
+    - add debian/patches/series
+
+  [ Chris Coulson <chris.coulson@canonical.com> ]
+  * Switch to dpkg-source 3.0 (quilt) format
+    - add debian/source/format
+  * Fix script-in-etc-init.d-not-registered-via-update-rc.d warning
+    triggered by shipping the symlink to the upstart job
+    - add debian/ofono.lintian-overrides
+
+ -- Kalle Valo <kalle.valo@canonical.com>  Thu, 02 Sep 2010 18:21:57 +0100
+
+ofono (0.26-0ubuntu1) maverick; urgency=low
+
+  [ Kalle Valo <kalle.valo@canonical.com> ]
+  * New upstream release 0.26.
+  * Add watch file.
+
+  [ Chris Coulson <chris.coulson@canonical.com> ]
+  * Bump Standards-Version to 3.9.1, no other changes required
+    - update debian/control
+  * Bump debhelper build-depend to >= 7.0.50~ for override support
+    (fixes a lintian warning)
+  * Add a dependency on $remote_fs to init script
+    - update debian/ofono.init
+
+ -- Kalle Valo <kalle.valo@canonical.com>  Wed, 04 Aug 2010 17:59:41 +0300
+
+ofono (0.23-0ubuntu1) maverick; urgency=low
+
+  * New upstream version
+  * debian/control:
+    - build-depends on libcap-ng-dev
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Mon, 28 Jun 2010 17:09:26 +0200
+
+ofono (0.20-0ubuntu1) maverick; urgency=low
+
+  * New upstream release v0.20
+
+ -- Chris Coulson <chris.coulson@canonical.com>  Wed, 26 May 2010 11:18:35 +0100
+
+ofono (0.18-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Andres Salomon <dilinger@debian.org>  Thu, 18 Feb 2010 03:58:18 +0000
+
+ofono (0.9-1) unstable; urgency=low
+
+  * New upstream release.
+  * Since it runs w/out it, change the udev Depends to a Recommends.
+
+ -- Andres Salomon <dilinger@debian.org>  Mon, 02 Nov 2009 18:46:37 +0000
+
+ofono (0.8-1) unstable; urgency=low
+
+  * New upstream release.
+  * Drop cdbs and use debhelper 7 features instead.
+
+ -- Andres Salomon <dilinger@debian.org>  Sun, 18 Oct 2009 23:54:52 +0000
+
+ofono (0.7-1) unstable; urgency=low
+
+  * New upstream release.
+  * Also build-dep upon udev, as otherwise UDEV_DATADIR is set incorrectly
+    (closes: #549544).
+  * Ofono itself should also probably depend upon udev, eh?
+
+ -- Andres Salomon <dilinger@debian.org>  Sun, 04 Oct 2009 15:27:21 +0000
+
+ofono (0.6-3) unstable; urgency=low
+
+  * Build-dep upon libudev-dev and enable udev support.
+
+ -- Andres Salomon <dilinger@debian.org>  Sat, 03 Oct 2009 20:22:58 +0000
+
+ofono (0.6-2) unstable; urgency=low
+
+  * Add a -dbg package.
+
+ -- Andres Salomon <dilinger@debian.org>  Tue, 29 Sep 2009 20:05:20 +0000
+
+ofono (0.6-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Andres Salomon <dilinger@debian.org>  Mon, 28 Sep 2009 16:21:52 +0000
+
+ofono (0.5-1) unstable; urgency=low
+
+  * New upstream release.
+  * Be sure to create /var/lib/ofono (for the lulz).
+  * Silence some lintian warnings.
+
+ -- Andres Salomon <dilinger@debian.org>  Fri, 25 Sep 2009 22:58:23 +0000
+
+ofono (0.4-1) unstable; urgency=low
+
+  * New upstream release.
+  * Update copyright file.
+  * Include the new modem.conf.
+
+ -- Andres Salomon <dilinger@debian.org>  Thu, 03 Sep 2009 19:51:21 +0000
+
+ofono (0.3-1) unstable; urgency=low
+
+  * New upstream release.
+  * Drop ofonod manpage; merged upstream.
+
+ -- Andres Salomon <dilinger@debian.org>  Sat, 15 Aug 2009 15:55:11 +0000
+
+ofono (0.1-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Andres Salomon <dilinger@debian.org>  Sat, 11 Jul 2009 18:37:48 -0400
+
