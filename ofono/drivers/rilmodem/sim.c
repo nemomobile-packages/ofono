@@ -80,6 +80,8 @@
 
 /* Current SIM */
 static struct ofono_sim *current_sim;
+/* Current active app */
+int current_active_app = RIL_APPTYPE_UNKNOWN;
 
 /*
  * TODO: CDMA/IMS
@@ -520,10 +522,40 @@ static void configure_active_app(struct sim_data *sd,
 		sd->passwd_state = OFONO_SIM_PASSWORD_SIM_PUK;
 		break;
 	case APPSTATE_SUBSCRIPTION_PERSO:
-		/* TODO: Check out how to dig out exact
-		 * SIM lock.
-		 */
-		sd->passwd_state = OFONO_SIM_PASSWORD_PHSIM_PIN;
+		switch (app->perso_substate) {
+		case PERSOSUBSTATE_SIM_NETWORK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHNET_PIN;
+			break;
+		case PERSOSUBSTATE_SIM_NETWORK_SUBSET:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHNETSUB_PIN;
+			break;
+		case PERSOSUBSTATE_SIM_CORPORATE:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHCORP_PIN;
+			break;
+		case PERSOSUBSTATE_SIM_SERVICE_PROVIDER:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHSP_PIN;
+			break;
+		case PERSOSUBSTATE_SIM_SIM:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHSIM_PIN;
+			break;
+		case PERSOSUBSTATE_SIM_NETWORK_PUK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHNET_PUK;
+			break;
+		case PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHNETSUB_PUK;
+			break;
+		case PERSOSUBSTATE_SIM_CORPORATE_PUK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHCORP_PUK;
+			break;
+		case PERSOSUBSTATE_SIM_SERVICE_PROVIDER_PUK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHSP_PUK;
+			break;
+		case PERSOSUBSTATE_SIM_SIM_PUK:
+			sd->passwd_state = OFONO_SIM_PASSWORD_PHFSIM_PUK;
+			break;
+		default:
+			break;
+		};
 		break;
 	case APPSTATE_READY:
 		sd->passwd_state = OFONO_SIM_PASSWORD_NONE;
@@ -561,6 +593,7 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 		for (i = 0; i < status.num_apps; i++) {
 			if (i == search_index &&
 				apps[i]->app_type != RIL_APPTYPE_UNKNOWN) {
+				current_active_app = apps[i]->app_type;
 				configure_active_app(sd, apps[i], i);
 				break;
 			}
@@ -877,6 +910,8 @@ static int ril_sim_probe(struct ofono_sim *sim, unsigned int vendor,
 	sd->passwd_state = OFONO_SIM_PASSWORD_NONE;
 	sd->sim_registered = FALSE;
 
+	current_sim = sim;
+
 	ofono_sim_set_data(sim, sd);
 
         /*
@@ -960,4 +995,9 @@ struct ofono_sim_driver *get_sim_driver()
 struct ofono_sim *get_sim()
 {
 	return current_sim;
+}
+
+gint ril_get_app_type()
+{
+	return current_active_app;
 }
