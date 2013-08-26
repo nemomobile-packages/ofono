@@ -53,6 +53,15 @@ Obsoletes:  ofono-test < 1.0
 %description tests
 Scripts for testing oFono and its functionality
 
+%package ofono-configs-mer
+Summary:    Package to provide default configs for ofono
+Group:      Development/Tools
+Requires:   %{name} = %{version}-%{release}
+Provides:   ofono-configs
+
+%description ofono-configs-mer
+This package provides default configs for ofono
+
 %prep
 %setup -q -n %{name}-%{version}/%{name}
 
@@ -127,3 +136,9 @@ systemctl daemon-reload
 %{_libdir}/%{name}/test/*
 # >> files tests
 # << files tests
+
+%files ofono-configs-mer
+%defattr(-,root,root,-)
+%config /etc/ofono/ril_subscription.conf
+# >> files ofono-configs-mer
+# << files ofono-configs-mer
