@@ -222,7 +222,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 		if (gd->registerid != -1)
 			g_ril_unregister(gd->ril, gd->registerid);
 		gd->registerid = -1;
-	} else {
+	} else if (gd->notified) {
 		/*
 		 * Client is not approving succesful result
 		 * This covers the situation when context is
