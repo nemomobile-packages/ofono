@@ -216,10 +216,10 @@ static gboolean ril_get_net_config(struct radio_data *rsd)
 	else {
 		if (g_key_file_has_group(keyfile, LTE_FLAG)) {
 			alreadyset = g_key_file_get_groups(keyfile, NULL);
+			rsd->ratmode = PREF_NET_TYPE_LTE_GSM_WCDMA;
 			value = g_key_file_get_string(
 				keyfile, alreadyset[1], "read", NULL);
 			if (!value) {
-				rsd->ratmode = PREF_NET_TYPE_LTE_GSM_WCDMA;
 				g_key_file_set_boolean(
 				  keyfile, LTE_FLAG, "read", TRUE);
 				data = g_key_file_to_data(
