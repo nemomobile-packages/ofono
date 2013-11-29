@@ -99,7 +99,7 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 	if (parcel_r_int32(&rilp) > 0)
 		last_cause = parcel_r_int32(&rilp);
 
-	DBG("Call %d ended with RIL cause %d", id, last_cause);
+	ofono_info("Call %d ended with RIL cause %d", id, last_cause);
 	if (last_cause == CALL_FAIL_NORMAL || last_cause == CALL_FAIL_BUSY) {
 		reason = OFONO_DISCONNECT_REASON_REMOTE_HANGUP;
 	}
@@ -239,6 +239,7 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 	if (message->error == RIL_E_SUCCESS) {
 		decode_ril_error(&error, "OK");
 	} else {
+		ofono_error("generic fail");
 		decode_ril_error(&error, "FAIL");
 		goto out;
 	}
@@ -310,6 +311,7 @@ static void rild_cb(struct ril_msg *message, gpointer user_data)
 	if (message->error == RIL_E_SUCCESS) {
 		decode_ril_error(&error, "OK");
 	} else {
+		ofono_error("call failed.");
 		decode_ril_error(&error, "FAIL");
 		goto out;
 	}
@@ -352,6 +354,8 @@ static void ril_dial(struct ofono_voicecall *vc,
 	int request = RIL_REQUEST_DIAL;
 	int ret;
 
+	ofono_info("dialing");
+
 	cbd->user = vc;
 
 	parcel_init(&rilp);
@@ -379,6 +383,7 @@ static void ril_dial(struct ofono_voicecall *vc,
 
 	/* In case of error free cbd and return the cb with failure */
 	if (ret <= 0) {
+		ofono_error("Unable to call");
 		g_free(cbd);
 		CALLBACK_WITH_FAILURE(cb, data);
 	}
@@ -444,6 +449,7 @@ static void ril_hangup_specific(struct ofono_voicecall *vc,
 	if (ret > 0) {
 		CALLBACK_WITH_SUCCESS(cb, data);
 	} else {
+		ofono_error("unable to hangup specific");
 		CALLBACK_WITH_FAILURE(cb, data);
 	}
 }
