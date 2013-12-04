@@ -38,6 +38,7 @@
 
 #include "gril.h"
 #include "grilutil.h"
+#include "storage.h"
 
 #include "rilmodem.h"
 
@@ -200,39 +201,51 @@ static gboolean ril_get_net_config(struct radio_data *rsd)
 	GKeyFile *keyfile;
 	GError *err = NULL;
 	char *path = RIL_CONFIG;
-	char *data;
-	gsize length = 0;
 	char **alreadyset = NULL;
 	gboolean needsconfig = FALSE;
-	char *value = NULL;
+	gboolean value = FALSE;
 	rsd->ratmode = PREF_NET_TYPE_GSM_WCDMA_AUTO;
+
+	/*
+	 * First we need to check should the LTE be on
+	 * or not
+	*/
 
 	keyfile = g_key_file_new();
 
 	g_key_file_set_list_separator(keyfile, ',');
 
-	if (!g_key_file_load_from_file(keyfile, path, 0, &err))
+	if (!g_key_file_load_from_file(keyfile, path, 0, &err)) {
 		g_error_free(err);
-	else {
-		if (g_key_file_has_group(keyfile, LTE_FLAG)) {
-			alreadyset = g_key_file_get_groups(keyfile, NULL);
+		return needsconfig;
+	} else {
+		if (g_key_file_has_group(keyfile, LTE_FLAG))
 			rsd->ratmode = PREF_NET_TYPE_LTE_GSM_WCDMA;
-			value = g_key_file_get_string(
-				keyfile, alreadyset[1], "read", NULL);
-			if (!value) {
-				g_key_file_set_boolean(
-				  keyfile, LTE_FLAG, "read", TRUE);
-				data = g_key_file_to_data(
-				  keyfile, &length, NULL);
-				g_file_set_contents(path, data, length, NULL);
-				g_free(data);
-				needsconfig = TRUE;
-			} else
-				g_free(value);
-			g_strfreev(alreadyset);
-		}
 	}
+
 	g_key_file_free(keyfile);
+
+	/* Then we need to check if it already set */
+
+	keyfile = storage_open(NULL, RIL_STORE);
+	alreadyset = g_key_file_get_groups(keyfile, NULL);
+	value = g_key_file_get_boolean(
+			keyfile, alreadyset[0], LTE_FLAG, NULL);
+
+	if (!value && rsd->ratmode == PREF_NET_TYPE_LTE_GSM_WCDMA) {
+			g_key_file_set_boolean(keyfile,
+				LTE_FLAG, LTE_FLAG, TRUE);
+			needsconfig = TRUE;
+	} else if (value && rsd->ratmode == PREF_NET_TYPE_GSM_WCDMA_AUTO) {
+			g_key_file_set_boolean(keyfile,
+				LTE_FLAG, LTE_FLAG, FALSE);
+			needsconfig = TRUE;
+	}
+
+	g_strfreev(alreadyset);
+
+	storage_close(NULL, RIL_STORE, keyfile, TRUE);
+
 	return needsconfig;
 }
 
