@@ -33,6 +33,8 @@
 #include <gril.h>
 #include <parcel.h>
 #include <gdbus.h>
+#include <linux/capability.h>
+#include <linux/prctl.h>
 
 #define OFONO_API_SUBJECT_TO_CHANGE
 #include <ofono/plugin.h>
@@ -62,6 +64,8 @@
 
 #define MAX_POWER_ON_RETRIES 5
 #define MAX_SIM_STATUS_RETRIES 15
+#define RADIO_ID 1001
+#define MAX_PDP_CONTEXTS 2
 
 struct ril_data {
 	GRil *modem;
@@ -237,18 +241,22 @@ static void ril_post_sim(struct ofono_modem *modem)
 	struct ofono_gprs *gprs;
 	struct ofono_gprs_context *gc;
 	struct ofono_message_waiting *mw;
-
+	int i;
 	/* TODO: this function should setup:
 	 *  - stk ( SIM toolkit )
 	 */
 	ofono_sms_create(modem, 0, "rilmodem", ril->modem);
 
 	gprs = ofono_gprs_create(modem, 0, "rilmodem", ril->modem);
-	gc = ofono_gprs_context_create(modem, 0, "rilmodem", ril->modem);
-
-	if (gprs && gc) {
-		DBG("calling gprs_add_context");
-		ofono_gprs_add_context(gprs, gc);
+	if (gprs) {
+		for (i = 0; i < MAX_PDP_CONTEXTS; i++) {
+			gc = ofono_gprs_context_create(modem, 0, "rilmodem",
+					ril->modem);
+			if (gc == NULL)
+				break;
+				
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
 	ofono_radio_settings_create(modem, 0, "rilmodem", ril->modem);
@@ -411,10 +419,31 @@ static void gril_disconnected(gpointer user_data)
 	if (modem) {
 		ofono_modem_remove(modem);
 		mce_disconnect(conn, user_data);
-		reconnect_timer =
-			g_timeout_add_seconds(2, ril_re_init, NULL);
+		reconnect_timer = g_timeout_add_seconds(2, ril_re_init, NULL);
 	}
+}
 
+void ril_switchUser()
+{
+	if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0)
+		ofono_error("prctl(PR_SET_KEEPCAPS) failed:%s,%d",
+							strerror(errno), errno);
+
+	if (setgid(RADIO_ID) < 0 )
+		ofono_error("setgid(%d) failed:%s,%d",
+				RADIO_ID, strerror(errno), errno);
+	if (setuid(RADIO_ID) < 0 )
+		ofono_error("setuid(%d) failed:%s,%d",
+				RADIO_ID, strerror(errno), errno);
+
+	struct __user_cap_header_struct header;
+	struct __user_cap_data_struct cap;
+	header.version = _LINUX_CAPABILITY_VERSION;
+	header.pid = 0;
+	cap.effective = cap.permitted = (1 << CAP_NET_ADMIN)
+						| (1 << CAP_NET_RAW);
+	cap.inheritable = 0;
+	capset(&header, &cap);
 }
 
 static int ril_enable(struct ofono_modem *modem)
@@ -423,6 +452,9 @@ static int ril_enable(struct ofono_modem *modem)
 	struct ril_data *ril = ofono_modem_get_data(modem);
 
 	ril->have_sim = FALSE;
+
+	/* RIL expects user radio */
+	ril_switchUser();
 
 	ril->modem = g_ril_new();
 	g_ril_set_disconnect_function(ril->modem, gril_disconnected, modem);
