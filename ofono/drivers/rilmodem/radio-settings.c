@@ -209,7 +209,7 @@ static gboolean ril_get_net_config(struct radio_data *rsd)
 	/*
 	 * First we need to check should the LTE be on
 	 * or not
-	*/
+	 */
 
 	keyfile = g_key_file_new();
 
@@ -229,7 +229,9 @@ static gboolean ril_get_net_config(struct radio_data *rsd)
 
 	keyfile = storage_open(NULL, RIL_STORE);
 	alreadyset = g_key_file_get_groups(keyfile, NULL);
-	value = g_key_file_get_boolean(
+
+	if (alreadyset[0])
+		value = g_key_file_get_boolean(
 			keyfile, alreadyset[0], LTE_FLAG, NULL);
 
 	if (!value && rsd->ratmode == PREF_NET_TYPE_LTE_GSM_WCDMA) {
