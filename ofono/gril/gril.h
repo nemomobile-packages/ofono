@@ -140,6 +140,7 @@ gboolean g_ril_unregister_all(GRil *ril);
 
 gchar *current_passwd;
 guint current_online_state;
+gchar *current_iccid;
 
 #ifdef __cplusplus
 }
