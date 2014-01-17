@@ -2992,8 +2992,15 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
 	const char *path = __ofono_atom_get_path(gprs->atom);
 
-	if (gprs->contexts == NULL) /* Automatic provisioning failed */
-		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+	if (gprs->contexts == NULL) {
+		/* Automatic provisioning failed */
+		struct pri_context *context = add_context(gprs, NULL,
+					OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+		if (context) {
+			strcpy(context->context.apn, "internet");
+		}
+		/* Should MMS context be created as well? */
+	}
 
 	if (!g_dbus_register_interface(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
