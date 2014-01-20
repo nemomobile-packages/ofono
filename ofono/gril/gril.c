@@ -901,9 +901,12 @@ static struct ril_s *create_ril()
 	}
 
 	current_passwd = g_try_malloc(16);
+	current_iccid = g_try_malloc(21);
 	if (current_passwd)
 		g_stpcpy(current_passwd, defaultpasswd);
 	current_online_state = RIL_OFFLINE;
+	if (current_iccid)
+		g_stpcpy(current_iccid, defaultpasswd);
 
 	return ril;
 

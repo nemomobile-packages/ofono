@@ -606,6 +606,9 @@ static void ril_exit(void)
 	if (current_passwd)
 		g_free(current_passwd);
 
+	if (current_iccid)
+		g_free(current_iccid);
+
 	g_dbus_remove_watch(connection, mce_daemon_watch);
 
 	if (signal_watch > 0)

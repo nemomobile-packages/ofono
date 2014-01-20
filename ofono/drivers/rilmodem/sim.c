@@ -39,6 +39,7 @@
 #include "ofono.h"
 
 #include "simutil.h"
+#include "smsutil.h"
 #include "util.h"
 
 #include "gril.h"
@@ -102,6 +103,7 @@ struct sim_data {
 	enum ofono_sim_password_type passwd_state;
 	guint card_state;
 	guint idle_id;
+	guint file_id;
 };
 
 static void ril_pin_change_state_cb(struct ril_msg *message,
@@ -248,6 +250,8 @@ static void ril_sim_read_info(struct ofono_sim *sim, int fileid,
 	struct parcel rilp;
 	int request = RIL_REQUEST_SIM_IO;
 	guint ret;
+
+	sd->file_id = fileid;
 	cbd->user = sd;
 
 	parcel_init(&rilp);
@@ -299,11 +303,43 @@ static void ril_sim_read_info(struct ofono_sim *sim, int fileid,
 	}
 }
 
+void storeiccid(guchar *response, int response_len,
+				struct sim_data *sd,
+				struct cb_data *cbd)
+{
+	char iccid[21];
+	char *new_iccid;
+	struct parcel rilp;
+
+	extract_bcd_number(response, response_len, iccid);
+	new_iccid = g_strdup(iccid);
+
+	if (strcmp(current_iccid, new_iccid)) {
+		g_stpcpy(current_passwd, defaultpasswd);
+		__ofono_sim_recheck_pin(cbd->user);
+		g_stpcpy(current_iccid, new_iccid);
+	} else if (sd->passwd_state ==
+				OFONO_SIM_PASSWORD_SIM_PIN) {
+		parcel_init(&rilp);
+			parcel_w_int32(&rilp,
+			ENTER_SIM_PIN_PARAMS);
+		parcel_w_string(&rilp, current_passwd);
+		parcel_w_string(&rilp, sd->aid_str);
+		g_ril_send(sd->ril,
+				RIL_REQUEST_ENTER_SIM_PIN,
+				rilp.data, rilp.size, NULL,
+				NULL, g_free);
+		parcel_free(&rilp);
+	}
+
+	g_free(new_iccid);
+}
+
 static void ril_file_io_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
 	ofono_sim_read_cb_t cb = cbd->cb;
-	struct sim_data *sd = cbd->user;
+	struct sim_data *sd = ofono_sim_get_data(cbd->user);
 	struct ofono_error error;
 	int sw1 = 0, sw2 = 0, response_len = 0;
 	guchar *response = NULL;
@@ -328,6 +364,9 @@ static void ril_file_io_cb(struct ril_msg *message, gpointer user_data)
 		goto error;
 	}
 
+	if (sd->file_id == SIM_EF_ICCID_FILEID)
+		storeiccid(response, response_len, sd, cbd);
+
 	cb(&error, response, response_len, cbd->data);
 	g_free(response);
 	return;
@@ -348,7 +387,9 @@ static void ril_sim_read_binary(struct ofono_sim *sim, int fileid,
 	struct parcel rilp;
 	int request = RIL_REQUEST_SIM_IO;
 	guint ret;
-	cbd->user = sd;
+
+	sd->file_id = fileid;
+	cbd->user = sim;
 
 	g_ril_append_print_buf(sd->ril,
 				"(cmd=0x%.2X,efid=0x%.4X,",
@@ -402,7 +443,7 @@ static void ril_sim_read_record(struct ofono_sim *sim, int fileid,
 	struct parcel rilp;
 	int request = RIL_REQUEST_SIM_IO;
 	guint ret;
-	cbd->user = sd;
+	cbd->user = sim;
 
 	parcel_init(&rilp);
 	parcel_w_int32(&rilp, CMD_READ_RECORD);
@@ -665,27 +706,10 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 			if (!strcmp(current_passwd, defaultpasswd)) {
 				__ofono_sim_recheck_pin(sim);
 			} else if (sd->passwd_state !=
-						OFONO_SIM_PASSWORD_SIM_PIN) {
+						OFONO_SIM_PASSWORD_SIM_PIN)
 				__ofono_sim_recheck_pin(sim);
-			} else if (sd->passwd_state ==
-						OFONO_SIM_PASSWORD_SIM_PIN) {
-				parcel_init(&rilp);
-
-				parcel_w_int32(&rilp,
-					ENTER_SIM_PIN_PARAMS);
-				parcel_w_string(&rilp, current_passwd);
-				parcel_w_string(&rilp, sd->aid_str);
-
-				g_ril_send(sd->ril,
-						RIL_REQUEST_ENTER_SIM_PIN,
-						rilp.data, rilp.size, NULL,
-						NULL, g_free);
-
-				parcel_free(&rilp);
-			}
-		} else {
+		} else
 			__ofono_sim_recheck_pin(sim);
-		}
 
 		if (current_online_state == RIL_ONLINE_PREF) {
 
@@ -716,9 +740,6 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 				sd->card_state, status.card_state);
 			ofono_sim_inserted_notify(sim, FALSE);
 			sd->card_state = RIL_CARDSTATE_ABSENT;
-
-			if (current_passwd)
-				g_stpcpy(current_passwd, defaultpasswd);
 		}
 	}
 
