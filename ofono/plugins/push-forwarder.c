@@ -448,7 +448,7 @@ push_forwarder_plugin_free(
     push_forwarder_plugin* plugin)
 {
     if (plugin) {
-	__ofono_modemwatch_remove(plugin->modem_watch_id);
+        __ofono_modemwatch_remove(plugin->modem_watch_id);
         g_slist_free_full(plugin->modems, push_forwarder_free_modem_cb);
         g_slist_free_full(plugin->handlers, push_forwarder_free_handler);
         g_free(plugin);
