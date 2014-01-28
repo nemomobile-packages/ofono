@@ -3,11 +3,10 @@ Description=Telephony service
 After=syslog.target
 
 [Service]
-Type=dbus
-BusName=org.ofono
+Type=notify
 User=root
 EnvironmentFile=-/var/lib/environment/ofono/*.conf
-ExecStart=@prefix@/sbin/ofonod -n $OFONO_ARGS
+ExecStart=@prefix@/sbin/ofonod -n --systemd $OFONO_ARGS
 StandardError=null
 Restart=always
 RestartSec=3

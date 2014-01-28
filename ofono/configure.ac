@@ -101,6 +101,13 @@ else
 fi
 AC_SUBST(DBUS_DATADIR)
 
+AC_ARG_ENABLE(systemd, AC_HELP_STRING([--enable-systemd],
+			[enable systemd notify on start]), [
+	if (test "${enableval}" = "yes"); then
+		CFLAGS="$CFLAGS -DSYSTEMD -lsystemd-daemon"
+	fi
+])
+
 AC_ARG_WITH([systemdunitdir], AC_HELP_STRING([--with-systemdunitdir=DIR],
 	[path to systemd service directory]), [path_systemdunit=${withval}],
 		[path_systemdunit="`$PKG_CONFIG --variable=systemdsystemunitdir systemd`"])
