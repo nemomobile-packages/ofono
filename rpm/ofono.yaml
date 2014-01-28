@@ -20,6 +20,7 @@ PkgConfigBR:
     - libudev >= 145
     - bluez >= 4.85
     - mobile-broadband-provider-info
+    - libsystemd-daemon
 SetupOptions: -q -n %{name}-%{version}/%{name}
 ConfigOptions:
     - --enable-dundee
