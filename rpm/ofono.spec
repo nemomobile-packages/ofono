@@ -27,6 +27,7 @@ BuildRequires:  pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(libudev) >= 145
 BuildRequires:  pkgconfig(bluez) >= 4.85
 BuildRequires:  pkgconfig(mobile-broadband-provider-info)
+BuildRequires:  pkgconfig(libsystemd-daemon)
 BuildRequires:  libtool
 BuildRequires:  automake
 BuildRequires:  autoconf
@@ -78,7 +79,8 @@ autoreconf --force --install
 %configure --disable-static \
     --enable-dundee \
     --enable-test \
-    --with-systemdunitdir="/%{_lib}/systemd/system"
+    --with-systemdunitdir="/%{_lib}/systemd/system" \
+    --enable-systemd
 
 make %{?jobs:-j%jobs}
 

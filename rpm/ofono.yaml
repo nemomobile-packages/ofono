@@ -20,11 +20,13 @@ PkgConfigBR:
     - libudev >= 145
     - bluez >= 4.85
     - mobile-broadband-provider-info
+    - libsystemd-daemon
 SetupOptions: -q -n %{name}-%{version}/%{name}
 ConfigOptions:
     - --enable-dundee
     - --enable-test
     - --with-systemdunitdir="/%{_lib}/systemd/system"
+    - --enable-systemd
 SubPackages:
     - Name: devel
       Summary: Headers for oFono
