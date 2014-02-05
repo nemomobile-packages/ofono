@@ -192,7 +192,7 @@ AM_CONDITIONAL(BLUETOOTH, test "${enable_bluetooth}" != "no")
 AC_ARG_ENABLE(nettime, AC_HELP_STRING([--disable-nettime],
                                 [disable Nettime plugin]),
                                         [enable_nettime=${enableval}])
-AM_CONDITIONAL(NETTIME, test "${enable_netttime}" != "no")
+AM_CONDITIONAL(NETTIME, test "${enable_nettime}" != "no")
 
 AC_ARG_WITH([provisiondb], AC_HELP_STRING([--with-provisiondb=FILE],
 	[location of provision database]), [path_provisiondb=${withval}])
