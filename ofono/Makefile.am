@@ -508,6 +508,7 @@ endif
 if NETTIME
 builtin_modules += nettime
 builtin_sources += plugins/nettime.c
+builtin_libadd += -lrt
 endif
 
 if PROVISION
