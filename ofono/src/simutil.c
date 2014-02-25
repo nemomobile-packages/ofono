@@ -767,10 +767,12 @@ static char *sim_network_name_parse(const unsigned char *buffer, int length,
 					gboolean *add_ci)
 {
 	char *ret = NULL;
-	unsigned char *endp;
 	unsigned char dcs;
 	int i;
 	gboolean ci = FALSE;
+	long written;
+	unsigned long max_to_unpack;
+	unsigned char *unpacked;
 
 	if (length < 1)
 		return NULL;
@@ -787,11 +789,16 @@ static char *sim_network_name_parse(const unsigned char *buffer, int length,
 
 	switch (dcs & (7 << 4)) {
 	case 0x00:
-		endp = memchr(buffer, 0xff, length);
-		if (endp)
-			length = endp - buffer;
-		ret = convert_gsm_to_utf8(buffer, length,
+		max_to_unpack = length * 8 / 7;
+		unpacked = unpack_7bit(buffer, length, 0, FALSE,
+							max_to_unpack,
+							&written, 0);
+		if (unpacked == NULL)
+			return NULL;
+
+		ret = convert_gsm_to_utf8(unpacked, written,
 				NULL, NULL, 0xff);
+		g_free(unpacked);
 		break;
 	case 0x10:
 		if ((length % 2) == 1) {
