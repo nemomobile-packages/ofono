@@ -56,12 +56,7 @@ struct gsm_data {
 	GSList *apns;
 	gboolean match_found;
 	gboolean allow_duplicates;
-};
-
-struct cdma_data {
-	const char *match_sid;
 	char *provider_name;
-	gboolean match_found;
 };
 
 const char *mbpi_ap_type(enum ofono_gprs_context_type type)
@@ -82,15 +77,16 @@ static GQuark mbpi_error_quark(void)
 	return g_quark_from_static_string("ofono-mbpi-error-quark");
 }
 
-void mbpi_ap_free(struct ofono_gprs_provision_data *ap)
+void mbpi_ap_free(struct mbpi_provision_data *ap)
 {
-	g_free(ap->name);
-	g_free(ap->apn);
-	g_free(ap->username);
-	g_free(ap->password);
-	g_free(ap->message_proxy);
-	g_free(ap->message_center);
+	g_free(ap->provision_data.name);
+	g_free(ap->provision_data.apn);
+	g_free(ap->provision_data.username);
+	g_free(ap->provision_data.password);
+	g_free(ap->provision_data.message_proxy);
+	g_free(ap->provision_data.message_center);
 
+	g_free(ap->provider_name);
 	g_free(ap);
 }
 
@@ -164,25 +160,25 @@ static void apn_start(GMarkupParseContext *context, const gchar *element_name,
 			const gchar **attribute_values,
 			gpointer userdata, GError **error)
 {
-	struct ofono_gprs_provision_data *apn = userdata;
+	struct mbpi_provision_data *apn = userdata;
 
 	if (g_str_equal(element_name, "name"))
-		g_markup_parse_context_push(context, &text_parser, &apn->name);
+		g_markup_parse_context_push(context, &text_parser, &apn->provision_data.name);
 	else if (g_str_equal(element_name, "username"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->username);
+						&apn->provision_data.username);
 	else if (g_str_equal(element_name, "password"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->password);
+						&apn->provision_data.password);
 	else if (g_str_equal(element_name, "mmsc"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->message_center);
+						&apn->provision_data.message_center);
 	else if (g_str_equal(element_name, "mmsproxy"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->message_proxy);
+						&apn->provision_data.message_proxy);
 	else if (g_str_equal(element_name, "usage"))
 		usage_start(context, attribute_names, attribute_values,
-				&apn->type, error);
+				&apn->provision_data.type, error);
 }
 
 static void apn_end(GMarkupParseContext *context, const gchar *element_name,
@@ -263,7 +259,7 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 			const gchar **attribute_values,
 			GError **error)
 {
-	struct ofono_gprs_provision_data *ap;
+	struct mbpi_provision_data *ap;
 	const char *apn;
 	int i;
 
@@ -287,40 +283,13 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 		return;
 	}
 
-	ap = g_new0(struct ofono_gprs_provision_data, 1);
-	ap->apn = g_strdup(apn);
-	ap->type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
-	ap->proto = OFONO_GPRS_PROTO_IP;
+	ap = g_new0(struct mbpi_provision_data, 1);
+	ap->provision_data.apn = g_strdup(apn);
+	ap->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
+	ap->provision_data.proto = OFONO_GPRS_PROTO_IP;
+	ap->provider_name = g_strdup(gsm->provider_name);
 
 	g_markup_parse_context_push(context, &apn_parser, ap);
-}
-
-static void sid_handler(GMarkupParseContext *context,
-				struct cdma_data *cdma,
-				const gchar **attribute_names,
-				const gchar **attribute_values,
-				GError **error)
-{
-	const char *sid = NULL;
-	int i;
-
-	for (i = 0; attribute_names[i]; i++) {
-		if (g_str_equal(attribute_names[i], "value") == FALSE)
-			continue;
-
-		sid = attribute_values[i];
-		break;
-	}
-
-	if (sid == NULL) {
-		mbpi_g_set_error(context, error, G_MARKUP_ERROR,
-					G_MARKUP_ERROR_MISSING_ATTRIBUTE,
-					"Missing attribute: sid");
-		return;
-	}
-
-	if (g_str_equal(sid, cdma->match_sid))
-		cdma->match_found = TRUE;
 }
 
 static void gsm_start(GMarkupParseContext *context, const gchar *element_name,
@@ -349,7 +318,7 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 			gpointer userdata, GError **error)
 {
 	struct gsm_data *gsm;
-	struct ofono_gprs_provision_data *ap;
+	struct mbpi_provision_data *ap;
 
 	if (!g_str_equal(element_name, "apn"))
 		return;
@@ -364,9 +333,9 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 		GSList *l;
 
 		for (l = gsm->apns; l; l = l->next) {
-			struct ofono_gprs_provision_data *pd = l->data;
+			struct mbpi_provision_data *pd = l->data;
 
-			if (pd->type != ap->type)
+			if (pd->provision_data.type != ap->provision_data.type)
 				continue;
 
 			mbpi_g_set_error(context, error, mbpi_error_quark(),
@@ -389,50 +358,20 @@ static const GMarkupParser gsm_parser = {
 	NULL,
 };
 
-static void cdma_start(GMarkupParseContext *context, const gchar *element_name,
-			const gchar **attribute_names,
-			const gchar **attribute_values,
-			gpointer userdata, GError **error)
-{
-	if (g_str_equal(element_name, "sid")) {
-		struct cdma_data *cdma = userdata;
-		/*
-		 * For entries with multiple sid elements, don't bother
-		 * searching if we already have a match
-		 */
-		if (cdma->match_found == TRUE)
-			return;
-
-		sid_handler(context, cdma, attribute_names, attribute_values,
-				error);
-	}
-}
-
-static const GMarkupParser cdma_parser = {
-	cdma_start,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-};
-
 static void provider_start(GMarkupParseContext *context,
 				const gchar *element_name,
 				const gchar **attribute_names,
 				const gchar **attribute_values,
 				gpointer userdata, GError **error)
 {
+	struct gsm_data *gsm = userdata;
 	if (g_str_equal(element_name, "name")) {
-		struct cdma_data *cdma = userdata;
-
-		g_free(cdma->provider_name);
-		cdma->provider_name = NULL;
+		g_free(gsm->provider_name);
+		gsm->provider_name = NULL;
 		g_markup_parse_context_push(context, &text_parser,
-						&cdma->provider_name);
+			&gsm->provider_name);
 	} else if (g_str_equal(element_name, "gsm"))
-		g_markup_parse_context_push(context, &skip_parser, NULL);
-	else if (g_str_equal(element_name, "cdma"))
-		g_markup_parse_context_push(context, &cdma_parser, userdata);
+		g_markup_parse_context_push(context, &gsm_parser, userdata);
 }
 
 static void provider_end(GMarkupParseContext *context,
@@ -440,8 +379,7 @@ static void provider_end(GMarkupParseContext *context,
 					gpointer userdata, GError **error)
 {
 	if (g_str_equal(element_name, "name") ||
-				g_str_equal(element_name, "gsm") ||
-				g_str_equal(element_name, "cdma"))
+				g_str_equal(element_name, "gsm"))
 		g_markup_parse_context_pop(context);
 
 }
@@ -454,56 +392,19 @@ static const GMarkupParser provider_parser = {
 	NULL,
 };
 
-static void toplevel_gsm_start(GMarkupParseContext *context,
+static void toplevel_provider_start(GMarkupParseContext *context,
 					const gchar *element_name,
 					const gchar **atribute_names,
 					const gchar **attribute_values,
 					gpointer userdata, GError **error)
 {
 	struct gsm_data *gsm = userdata;
-
-	if (g_str_equal(element_name, "gsm")) {
-		gsm->match_found = FALSE;
-		g_markup_parse_context_push(context, &gsm_parser, gsm);
-	} else if (g_str_equal(element_name, "cdma"))
-		g_markup_parse_context_push(context, &skip_parser, NULL);
+	gsm->match_found = FALSE;
+	if (g_str_equal(element_name, "provider"))
+		g_markup_parse_context_push(context, &provider_parser, gsm);
 }
 
-static void toplevel_gsm_end(GMarkupParseContext *context,
-					const gchar *element_name,
-					gpointer userdata, GError **error)
-{
-	if (g_str_equal(element_name, "gsm") ||
-			g_str_equal(element_name, "cdma"))
-		g_markup_parse_context_pop(context);
-}
-
-static const GMarkupParser toplevel_gsm_parser = {
-	toplevel_gsm_start,
-	toplevel_gsm_end,
-	NULL,
-	NULL,
-	NULL,
-};
-
-static void toplevel_cdma_start(GMarkupParseContext *context,
-					const gchar *element_name,
-					const gchar **atribute_names,
-					const gchar **attribute_values,
-					gpointer userdata, GError **error)
-{
-	struct cdma_data *cdma = userdata;
-
-	if (g_str_equal(element_name, "provider") == FALSE)
-		return;
-
-	if (cdma->match_found == TRUE)
-		g_markup_parse_context_push(context, &skip_parser, NULL);
-	else
-		g_markup_parse_context_push(context, &provider_parser, cdma);
-}
-
-static void toplevel_cdma_end(GMarkupParseContext *context,
+static void toplevel_provider_end(GMarkupParseContext *context,
 					const gchar *element_name,
 					gpointer userdata, GError **error)
 {
@@ -511,9 +412,9 @@ static void toplevel_cdma_end(GMarkupParseContext *context,
 		g_markup_parse_context_pop(context);
 }
 
-static const GMarkupParser toplevel_cdma_parser = {
-	toplevel_cdma_start,
-	toplevel_cdma_end,
+static const GMarkupParser toplevel_provider_parser = {
+	toplevel_provider_start,
+	toplevel_provider_end,
 	NULL,
 	NULL,
 	NULL,
@@ -583,7 +484,7 @@ GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 	gsm.match_mnc = mnc;
 	gsm.allow_duplicates = allow_duplicates;
 
-	if (mbpi_parse(&toplevel_gsm_parser, &gsm, error) == FALSE) {
+	if (mbpi_parse(&toplevel_provider_parser, &gsm, error) == FALSE) {
 		for (l = gsm.apns; l; l = l->next)
 			mbpi_ap_free(l->data);
 
@@ -596,15 +497,6 @@ GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 
 char *mbpi_lookup_cdma_provider_name(const char *sid, GError **error)
 {
-	struct cdma_data cdma;
-
-	memset(&cdma, 0, sizeof(cdma));
-	cdma.match_sid = sid;
-
-	if (mbpi_parse(&toplevel_cdma_parser, &cdma, error) == FALSE) {
-		g_free(cdma.provider_name);
-		cdma.provider_name = NULL;
-	}
-
-	return cdma.provider_name;
+	/* Oops, no CDMA support anymore. */
+	return NULL;
 }

@@ -2,7 +2,7 @@
  *
  *  oFono - Open Source Telephony
  *
- *  Copyright (C) 2008-2011  Intel Corporation. All rights reserved.
+ *  Copyright (C) 2014 Jolla. All rights reserved.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -19,16 +19,10 @@
  *
  */
 
-struct mbpi_provision_data {
-	struct ofono_gprs_provision_data provision_data;
-	char *provider_name;
-};
+struct ofono_gprs_provision_data;
 
-const char *mbpi_ap_type(enum ofono_gprs_context_type type);
+int provision_get_settings(const char *mcc, const char *mnc,
+				const char *spn,
+				struct ofono_gprs_provision_data **settings,
+				int *count);
 
-void mbpi_ap_free(struct mbpi_provision_data *data);
-
-GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
-			gboolean allow_duplicates, GError **error);
-
-char *mbpi_lookup_cdma_provider_name(const char *sid, GError **error);
