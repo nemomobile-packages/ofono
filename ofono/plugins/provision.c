@@ -79,7 +79,8 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 			GSList *next = l->next;
 			struct mbpi_provision_data *ap = l->data;
 
-			if ((ap->provision_data.name && strcasestr(ap->provision_data.name, spn))
+			if ((ap->provider_name && strcasestr(ap->provider_name, spn))
+				|| (ap->provision_data.name && strcasestr(ap->provision_data.name, spn))
 				|| (ap->provision_data.apn && strcasestr(ap->provision_data.apn, spn))) {
 				if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
 					best_internet = ap;
