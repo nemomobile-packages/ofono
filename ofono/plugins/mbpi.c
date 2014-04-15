@@ -82,15 +82,16 @@ static GQuark mbpi_error_quark(void)
 	return g_quark_from_static_string("ofono-mbpi-error-quark");
 }
 
-void mbpi_ap_free(struct ofono_gprs_provision_data *ap)
+void mbpi_ap_free(struct mbpi_provision_data *ap)
 {
-	g_free(ap->name);
-	g_free(ap->apn);
-	g_free(ap->username);
-	g_free(ap->password);
-	g_free(ap->message_proxy);
-	g_free(ap->message_center);
+	g_free(ap->provision_data.name);
+	g_free(ap->provision_data.apn);
+	g_free(ap->provision_data.username);
+	g_free(ap->provision_data.password);
+	g_free(ap->provision_data.message_proxy);
+	g_free(ap->provision_data.message_center);
 
+	g_free(ap->provider_name);
 	g_free(ap);
 }
 
@@ -164,25 +165,25 @@ static void apn_start(GMarkupParseContext *context, const gchar *element_name,
 			const gchar **attribute_values,
 			gpointer userdata, GError **error)
 {
-	struct ofono_gprs_provision_data *apn = userdata;
+	struct mbpi_provision_data *apn = userdata;
 
 	if (g_str_equal(element_name, "name"))
-		g_markup_parse_context_push(context, &text_parser, &apn->name);
+		g_markup_parse_context_push(context, &text_parser, &apn->provision_data.name);
 	else if (g_str_equal(element_name, "username"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->username);
+						&apn->provision_data.username);
 	else if (g_str_equal(element_name, "password"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->password);
+						&apn->provision_data.password);
 	else if (g_str_equal(element_name, "mmsc"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->message_center);
+						&apn->provision_data.message_center);
 	else if (g_str_equal(element_name, "mmsproxy"))
 		g_markup_parse_context_push(context, &text_parser,
-						&apn->message_proxy);
+						&apn->provision_data.message_proxy);
 	else if (g_str_equal(element_name, "usage"))
 		usage_start(context, attribute_names, attribute_values,
-				&apn->type, error);
+				&apn->provision_data.type, error);
 }
 
 static void apn_end(GMarkupParseContext *context, const gchar *element_name,
@@ -263,7 +264,7 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 			const gchar **attribute_values,
 			GError **error)
 {
-	struct ofono_gprs_provision_data *ap;
+	struct mbpi_provision_data *ap;
 	const char *apn;
 	int i;
 
@@ -287,10 +288,10 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 		return;
 	}
 
-	ap = g_new0(struct ofono_gprs_provision_data, 1);
-	ap->apn = g_strdup(apn);
-	ap->type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
-	ap->proto = OFONO_GPRS_PROTO_IP;
+	ap = g_new0(struct mbpi_provision_data, 1);
+	ap->provision_data.apn = g_strdup(apn);
+	ap->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
+	ap->provision_data.proto = OFONO_GPRS_PROTO_IP;
 
 	g_markup_parse_context_push(context, &apn_parser, ap);
 }
@@ -349,7 +350,7 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 			gpointer userdata, GError **error)
 {
 	struct gsm_data *gsm;
-	struct ofono_gprs_provision_data *ap;
+	struct mbpi_provision_data *ap;
 
 	if (!g_str_equal(element_name, "apn"))
 		return;
@@ -364,9 +365,9 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 		GSList *l;
 
 		for (l = gsm->apns; l; l = l->next) {
-			struct ofono_gprs_provision_data *pd = l->data;
+			struct mbpi_provision_data *pd = l->data;
 
-			if (pd->type != ap->type)
+			if (pd->provision_data.type != ap->provision_data.type)
 				continue;
 
 			mbpi_g_set_error(context, error, mbpi_error_quark(),

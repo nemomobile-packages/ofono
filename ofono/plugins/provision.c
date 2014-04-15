@@ -43,10 +43,10 @@
 /* Returns the list containing exactly one INTERNET and one MMS access point */
 static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 {
-	struct ofono_gprs_provision_data *best_internet = NULL;
-	struct ofono_gprs_provision_data *best_mms = NULL;
-	struct ofono_gprs_provision_data *second_best_internet = NULL;
-	struct ofono_gprs_provision_data *second_best_mms = NULL;
+	struct mbpi_provision_data *best_internet = NULL;
+	struct mbpi_provision_data *best_mms = NULL;
+	struct mbpi_provision_data *second_best_internet = NULL;
+	struct mbpi_provision_data *second_best_mms = NULL;
 	GSList *best_apns = NULL;
 	GSList *l;
 
@@ -54,11 +54,11 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 	l = apns;
 	while (l != NULL) {
 		GSList *next = l->next;
-		struct ofono_gprs_provision_data *ap = l->data;
+		struct mbpi_provision_data *ap = l->data;
 
-		if (ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
+		if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
 			best_internet = ap;
-		} else if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
+		} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
 			best_mms = ap;
 		}
 		l = next;
@@ -77,13 +77,13 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 		l = apns;
 		while (l != NULL) {
 			GSList *next = l->next;
-			struct ofono_gprs_provision_data *ap = l->data;
+			struct mbpi_provision_data *ap = l->data;
 
-			if ((ap->name && strcasestr(ap->name, spn))
-				|| (ap->apn && strcasestr(ap->apn, spn))) {
-				if (ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
+			if ((ap->provision_data.name && strcasestr(ap->provision_data.name, spn))
+				|| (ap->provision_data.apn && strcasestr(ap->provision_data.apn, spn))) {
+				if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
 					best_internet = ap;
-				} else if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
+				} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
 					best_mms = ap;
 				}
 			}
@@ -99,20 +99,20 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 
 	/* 3. if none found yet, create APNs with default values */
 	if (!best_internet) {
-		best_internet = g_try_new0(struct ofono_gprs_provision_data, 1);
+		best_internet = g_try_new0(struct mbpi_provision_data, 1);
 		if (best_internet) {
-			best_internet->type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
-			best_internet->name = g_strdup("Internet");
-			best_internet->apn = g_strdup("internet");
+			best_internet->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
+			best_internet->provision_data.name = g_strdup("Internet");
+			best_internet->provision_data.apn = g_strdup("internet");
 		}
 	}
 
 	if (!best_mms) {
-		best_mms = g_try_new0(struct ofono_gprs_provision_data, 1);
+		best_mms = g_try_new0(struct mbpi_provision_data, 1);
 		if (best_mms) {
-			best_mms->type = OFONO_GPRS_CONTEXT_TYPE_MMS;
-			best_mms->name = g_strdup("MMS");
-			best_mms->apn = g_strdup("mms");
+			best_mms->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_MMS;
+			best_mms->provision_data.name = g_strdup("MMS");
+			best_mms->provision_data.apn = g_strdup("mms");
 		}
 	}
 
@@ -168,16 +168,16 @@ int provision_get_settings(const char *mcc, const char *mnc,
 	*count = ap_count;
 
 	for (l = apns, i = 0; l; l = l->next, i++) {
-		struct ofono_gprs_provision_data *ap = l->data;
+		struct mbpi_provision_data *ap = l->data;
 
-		DBG("Name: '%s'", ap->name);
-		DBG("APN: '%s'", ap->apn);
-		DBG("Type: %s", mbpi_ap_type(ap->type));
-		DBG("Username: '%s'", ap->username);
-		DBG("Password: '%s'", ap->password);
+		DBG("Name: '%s'", ap->provision_data.name);
+		DBG("APN: '%s'", ap->provision_data.apn);
+		DBG("Type: %s", mbpi_ap_type(ap->provision_data.type));
+		DBG("Username: '%s'", ap->provision_data.username);
+		DBG("Password: '%s'", ap->provision_data.password);
 
 		memcpy(*settings + i, ap,
-			sizeof(struct ofono_gprs_provision_data));
+			sizeof(struct mbpi_provision_data));
 
 		g_free(ap);
 	}

@@ -19,9 +19,14 @@
  *
  */
 
+struct mbpi_provision_data {
+	struct ofono_gprs_provision_data provision_data;
+	char *provider_name;
+};
+
 const char *mbpi_ap_type(enum ofono_gprs_context_type type);
 
-void mbpi_ap_free(struct ofono_gprs_provision_data *data);
+void mbpi_ap_free(struct mbpi_provision_data *data);
 
 GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 			gboolean allow_duplicates, GError **error);
