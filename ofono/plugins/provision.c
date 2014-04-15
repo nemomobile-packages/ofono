@@ -56,9 +56,11 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 		GSList *next = l->next;
 		struct mbpi_provision_data *ap = l->data;
 
-		if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
+		if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET
+				&& !best_internet) {
 			best_internet = ap;
-		} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
+		} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS
+				&& !best_mms) {
 			best_mms = ap;
 		}
 		l = next;
@@ -80,11 +82,15 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 			struct mbpi_provision_data *ap = l->data;
 
 			if ((ap->provider_name && strcasestr(ap->provider_name, spn))
-				|| (ap->provision_data.name && strcasestr(ap->provision_data.name, spn))
-				|| (ap->provision_data.apn && strcasestr(ap->provision_data.apn, spn))) {
-				if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET && !best_internet) {
+				|| (ap->provision_data.name
+					&& strcasestr(ap->provision_data.name, spn))
+				|| (ap->provision_data.apn
+					&& strcasestr(ap->provision_data.apn, spn))) {
+				if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_INTERNET
+						&& !best_internet) {
 					best_internet = ap;
-				} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS && !best_mms) {
+				} else if (ap->provision_data.type == OFONO_GPRS_CONTEXT_TYPE_MMS
+						&& !best_mms) {
 					best_mms = ap;
 				}
 			}
@@ -102,18 +108,24 @@ static GSList *provision_normalize_apn_list(GSList *apns, const char* spn)
 	if (!best_internet) {
 		best_internet = g_try_new0(struct mbpi_provision_data, 1);
 		if (best_internet) {
-			best_internet->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
-			best_internet->provision_data.name = g_strdup("Internet");
-			best_internet->provision_data.apn = g_strdup("internet");
+			best_internet->provision_data.type =
+				OFONO_GPRS_CONTEXT_TYPE_INTERNET;
+			best_internet->provision_data.name =
+				g_strdup("Internet");
+			best_internet->provision_data.apn =
+				g_strdup("internet");
 		}
 	}
 
 	if (!best_mms) {
 		best_mms = g_try_new0(struct mbpi_provision_data, 1);
 		if (best_mms) {
-			best_mms->provision_data.type = OFONO_GPRS_CONTEXT_TYPE_MMS;
-			best_mms->provision_data.name = g_strdup("MMS");
-			best_mms->provision_data.apn = g_strdup("mms");
+			best_mms->provision_data.type =
+				OFONO_GPRS_CONTEXT_TYPE_MMS;
+			best_mms->provision_data.name =
+				g_strdup("MMS");
+			best_mms->provision_data.apn =
+				g_strdup("mms");
 		}
 	}
 
@@ -133,7 +145,7 @@ int provision_get_settings(const char *mcc, const char *mnc,
 	int ap_count;
 	int i;
 
-	DBG("Provisioning for MCC %s, MNC %s, SPN '%s'", mcc, mnc, spn);
+	ofono_info("Provisioning for MCC %s, MNC %s, SPN '%s'", mcc, mnc, spn);
 
 	/*
 	 * Passing FALSE to mbpi_lookup_apn() would return
@@ -145,14 +157,14 @@ int provision_get_settings(const char *mcc, const char *mnc,
 		g_error_free(error);
 	}
 
-	DBG("Found %d APs (in MBPI)", g_slist_length(apns));
+	ofono_info("Found %d APs in MBPI", g_slist_length(apns));
 	apns = provision_normalize_apn_list(apns, spn);
 	if (apns == NULL)
 		return -ENOENT;
 
 	ap_count = g_slist_length(apns);
 
-	DBG("Found %d APs", ap_count);
+	ofono_info("Provisioning %d APs", ap_count);
 
 	*settings = g_try_new0(struct ofono_gprs_provision_data, ap_count);
 	if (*settings == NULL) {
@@ -171,11 +183,11 @@ int provision_get_settings(const char *mcc, const char *mnc,
 	for (l = apns, i = 0; l; l = l->next, i++) {
 		struct mbpi_provision_data *ap = l->data;
 
-		DBG("Name: '%s'", ap->provision_data.name);
-		DBG("APN: '%s'", ap->provision_data.apn);
-		DBG("Type: %s", mbpi_ap_type(ap->provision_data.type));
-		DBG("Username: '%s'", ap->provision_data.username);
-		DBG("Password: '%s'", ap->provision_data.password);
+		ofono_info("Name: '%s'", ap->provision_data.name);
+		ofono_info("APN: '%s'", ap->provision_data.apn);
+		ofono_info("Type: %s", mbpi_ap_type(ap->provision_data.type));
+		ofono_info("Username: '%s'", ap->provision_data.username);
+		ofono_info("Password: '%s'", ap->provision_data.password);
 
 		memcpy(*settings + i, ap,
 			sizeof(struct mbpi_provision_data));
