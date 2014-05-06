@@ -559,6 +559,9 @@ endif
 builtin_modules += sms_history
 builtin_sources += plugins/smshistory.c
 
+builtin_modules += settings
+builtin_sources += plugins/settings.c
+
 sbin_PROGRAMS = src/ofonod
 
 src_ofonod_SOURCES = $(builtin_sources) src/ofono.ver \

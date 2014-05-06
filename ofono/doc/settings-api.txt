@@ -1,0 +1,52 @@
+Settings
+===============
+Service		org.ofono
+Interface	org.ofono.Settings
+Object path	[variable prefix]/{modem0,modem1,...}
+
+Methods		array{group,dict{ss}} GetAll()
+
+			Get an array of properties for all groups.
+
+			This method call should only be used once when
+			an application starts up. Further changes shall
+			be monitored via the Changed signal.
+
+		dict{ss} GetGroup(string group)
+
+			Get an array of properties for the specified group.
+
+			This method call should only be used once when
+			an application starts up. Further changes shall
+			be monitored via the Changed signal.
+
+			Possible Errors: [service].Error.InvalidArguments
+
+		string Get(string group, string key)
+
+			Gets the value of the specified setting.
+
+			Possible Errors: [service].Error.InvalidArguments
+					 [service].Error.NotFound
+
+		ResetAll()
+
+			Resets all settings to their default values.
+
+		ResetGroup(string group)
+
+			Resets all settings in the group to their default
+			values.
+
+			Possible Errors: [service].Error.InvalidArguments
+
+		string Reset(string group, string key)
+
+			Reset the the specified value to the default.
+
+			Possible Errors: [service].Error.InvalidArguments
+
+Signals		Changed(string group, string key, string value)
+
+			Signal is emitted whenever a setting has changed.
+			The new value is passed as the signal argument.
