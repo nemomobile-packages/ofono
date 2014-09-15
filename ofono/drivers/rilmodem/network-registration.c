@@ -78,12 +78,6 @@ static void extract_mcc_mnc(const char *str, char *mcc, char *mnc)
 	mnc[OFONO_MAX_MNC_LENGTH] = '\0';
 }
 
-/*
- * TODO: The functions in this file are stubbed out, and
- * will need to be re-worked to talk to the /gril layer
- * in order to get real values from RILD.
- */
-
 static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -109,7 +103,7 @@ static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 		return;
 	}
 
-	DBG("voice registration status is %d", status);
+	DBG("voice registration (pre) status %d", status);
 
 	if (status > 10)
 		status = status - 10;
@@ -117,7 +111,7 @@ static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 	if (status == NETWORK_REGISTRATION_STATUS_ROAMING)
 		status = check_if_really_roaming(status);
 
-	ofono_info("voice registration status is %d", status);
+	ofono_info("voice registration status %d", status);
 
 	nd->tech = tech;
 	cb(&error, status, lac, ci, tech, cbd->data);
@@ -406,7 +400,7 @@ static void ril_register_cb(struct ril_msg *message, gpointer user_data)
 		g_ril_print_response_no_args(nd->ril, message);
 
 	} else {
-		ofono_error("registration failed");
+		ofono_error("registration failed, ril result %d", message->error);
 		decode_ril_error(&error, "FAIL");
 	}
 
@@ -421,6 +415,8 @@ static void ril_register_auto(struct ofono_netreg *netreg,
 	int request = RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC;
 	int ret;
 	cbd->user = nd;
+
+	ofono_info("nw auto select");
 
 	ret = g_ril_send(nd->ril, request,
 				NULL, 0, ril_register_cb, cbd, g_free);
@@ -444,6 +440,8 @@ static void ril_register_manual(struct ofono_netreg *netreg,
 	struct parcel rilp;
 	int request = RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL;
 	int ret;
+
+	ofono_info("nw manual select: %s%s", mcc, mnc);
 
 	/* add *netreg_data to callback */
 	cbd->user = nd;
@@ -592,8 +590,10 @@ gint check_if_really_roaming(gint status)
 	struct sim_spdi *spdi = ofono_netreg_get_spdi(current_netreg);
 
 	if (spdi && net_mcc && net_mnc) {
-		if (sim_spdi_lookup(spdi, net_mcc, net_mnc))
+		if (sim_spdi_lookup(spdi, net_mcc, net_mnc)) {
+			ofono_info("resolved as not roaming based on spdi");
 			return NETWORK_REGISTRATION_STATUS_REGISTERED;
+		}
 		else
 			return status;
 	} else
