@@ -266,7 +266,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 		ofono_gprs_set_cid_range(gprs, 1, max_cids);
 	}
 
-	ofono_info("data registration status is %d", status);
+	DBG("data registration (pre) status %d", status);
 
 	if (status == NETWORK_REGISTRATION_STATUS_ROAMING)
 		status = check_if_really_roaming(status);
@@ -332,7 +332,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 error:
-	ofono_info("data registration status is %d", status);
+	ofono_info("data registration status %d", status);
 
 	if (cb)
 		cb(&error, status, cbd->data);
@@ -387,7 +387,7 @@ static void ril_data_probe_reg_cb(struct ril_msg *message, gpointer user_data)
 		status = check_if_really_roaming(status);
 
 out:
-	ofono_info("data registration status is %d", status);
+	ofono_info("data registration status %d", status);
 
 	DBG("Starting to listen network status");
 	gd->registerid = g_ril_register(gd->ril,
