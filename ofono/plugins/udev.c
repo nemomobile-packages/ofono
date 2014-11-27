@@ -303,6 +303,8 @@ done:
 		add_isi(modem, udev_device);
 	else if (g_strcmp0(driver, "n900") == 0)
 		add_isi(modem, udev_device);
+	else if (g_strcmp0(driver, "n950") == 0)
+		add_isi(modem, udev_device);
 	else if (g_strcmp0(driver, "calypso") == 0)
 		add_calypso(modem, udev_device);
 	else if (g_strcmp0(driver, "tc65") == 0)

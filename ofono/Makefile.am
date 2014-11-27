@@ -194,6 +194,9 @@ builtin_sources += plugins/isiusb.c
 builtin_modules += n900
 builtin_sources += plugins/n900.c plugins/nokia-gpio.h plugins/nokia-gpio.c
 
+builtin_modules += n950
+builtin_sources += plugins/n950.c
+
 builtin_modules += u8500
 builtin_sources += plugins/u8500.c
 endif
