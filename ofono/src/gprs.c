@@ -132,6 +132,13 @@ struct ofono_gprs_context {
 	struct ofono_atom *atom;
 };
 
+struct context_reset {
+	GSList *msgs;
+	const struct ofono_gprs_provision_data *ap;
+	struct ofono_gprs_provision_data *settings;
+	int count;
+};
+
 struct pri_context {
 	ofono_bool_t active;
 	enum ofono_gprs_context_type type;
@@ -144,6 +151,7 @@ struct pri_context {
 	char *proxy_host;
 	uint16_t proxy_port;
 	DBusMessage *pending;
+	struct context_reset *pending_reset;
 	struct ofono_gprs_primary_context context;
 	struct ofono_gprs_context *context_driver;
 	struct ofono_gprs *gprs;
@@ -151,6 +159,10 @@ struct pri_context {
 
 static void gprs_netreg_update(struct ofono_gprs *gprs);
 static void gprs_deactivate_next(struct ofono_gprs *gprs);
+static void write_context_settings(struct ofono_gprs *gprs,
+						struct pri_context *context);
+static void pri_deactivate_callback(const struct ofono_error *error,
+								void *data);
 
 static GSList *g_drivers = NULL;
 static GSList *g_context_drivers = NULL;
@@ -820,6 +832,256 @@ static void pri_update_mms_context_settings(struct pri_context *ctx)
 	pri_limit_mtu(settings->interface, MAX_MMS_MTU);
 }
 
+static gboolean pri_str_changed(const char *val, const char *newval)
+{
+	return newval ? (strcmp(val, newval) != 0) : !val[0];
+}
+
+static gboolean pri_str_update(char *val, const char *newval)
+{
+	if (newval) {
+		if (strcmp(val, newval)) {
+			strcpy(val, newval);
+			return TRUE;
+		}
+	} else {
+		if (val[0]) {
+			val[0] = 0;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+static void pri_str_signal_change(struct pri_context *ctx,
+					const char *name, const char *value)
+{
+	ofono_dbus_signal_property_changed(ofono_dbus_get_connection(),
+			ctx->path, OFONO_CONNECTION_CONTEXT_INTERFACE,
+					name, DBUS_TYPE_STRING, &value);
+}
+
+static void pri_reset_context_properties(struct pri_context *ctx,
+				const struct ofono_gprs_provision_data *ap)
+{
+	struct ofono_gprs *gprs = ctx->gprs;
+	gboolean changed = FALSE;
+
+	DBG("%s", ctx->path);
+
+	if (strcmp(ctx->context.apn, ap->apn)) {
+		changed = TRUE;
+		strcpy(ctx->context.apn, ap->apn);
+		pri_str_signal_change(ctx, "AccessPointName", ap->apn);
+	}
+
+	if (ap->name && strncmp(ctx->name, ap->name, MAX_CONTEXT_NAME_LENGTH)) {
+		changed = TRUE;
+		strncpy(ctx->name, ap->name, MAX_CONTEXT_NAME_LENGTH);
+		pri_str_signal_change(ctx, "Name", ap->name);
+	}
+
+	if (pri_str_update(ctx->context.username, ap->username)) {
+		changed = TRUE;
+		pri_str_signal_change(ctx, "Username", ap->username);
+	}
+
+	if (pri_str_update(ctx->context.password, ap->password)) {
+		changed = TRUE;
+		pri_str_signal_change(ctx, "Password", ap->password);
+	}
+
+	if (ctx->context.proto != ap->proto) {
+		ctx->context.proto = ap->proto;
+		changed = TRUE;
+		pri_str_signal_change(ctx, "Protocol",
+					gprs_proto_to_string(ap->proto));
+	}
+
+	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
+		if (pri_str_update(ctx->message_proxy, ap->message_proxy)) {
+			changed = TRUE;
+			pri_str_signal_change(ctx, "MessageProxy",
+							ap->message_proxy);
+		}
+
+		if (pri_str_update(ctx->message_center, ap->message_center)) {
+			changed = TRUE;
+			pri_str_signal_change(ctx, "MessageCenter",
+							ap->message_center);
+		}
+	}
+
+	if (gprs->settings && changed) {
+		write_context_settings(gprs, ctx);
+		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
+	}
+}
+
+static gboolean ap_valid(const struct ofono_gprs_provision_data *ap)
+{
+	if (!ap->apn || strlen(ap->apn) > OFONO_GPRS_MAX_APN_LENGTH ||
+							!is_valid_apn(ap->apn))
+		return FALSE;
+
+	if (ap->username &&
+			strlen(ap->username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+		return FALSE;
+
+	if (ap->password &&
+			strlen(ap->password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+		return FALSE;
+
+	if (ap->message_proxy &&
+			strlen(ap->message_proxy) > MAX_MESSAGE_PROXY_LENGTH)
+		return FALSE;
+
+	if (ap->message_center &&
+			strlen(ap->message_center) > MAX_MESSAGE_CENTER_LENGTH)
+		return FALSE;
+
+	return TRUE;
+}
+
+static gboolean pri_deactivation_required(struct pri_context *ctx,
+				const struct ofono_gprs_provision_data *ap)
+{
+	if (ctx->context.proto != ap->proto)
+		return TRUE;
+
+	if (strcmp(ctx->context.apn, ap->apn))
+		return TRUE;
+
+	if (pri_str_changed(ctx->context.username, ap->username))
+		return TRUE;
+
+	if (pri_str_changed(ctx->context.password, ap->password))
+		return TRUE;
+
+	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
+		if (pri_str_changed(ctx->message_proxy, ap->message_proxy))
+			return TRUE;
+
+		if (pri_str_changed(ctx->message_center, ap->message_center))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+static void pri_pending_reply_ok(gpointer data)
+{
+	DBusMessage *msg = data;
+	__ofono_dbus_pending_reply(&msg, dbus_message_new_method_return(msg));
+}
+
+static void pri_pending_reply_error(gpointer data)
+{
+	DBusMessage *msg = data;
+	__ofono_dbus_pending_reply(&msg, __ofono_error_failed(msg));
+}
+
+static void pri_reset_finish(struct pri_context *ctx, gboolean ok)
+{
+	struct context_reset *pr;
+
+	if (!ctx->pending_reset)
+		return;
+
+	pr = ctx->pending_reset;
+	ctx->pending_reset = NULL;
+
+	if (ok) {
+		pri_reset_context_properties(ctx, pr->ap);
+		g_slist_free_full(pr->msgs, pri_pending_reply_ok);
+	} else {
+		g_slist_free_full(pr->msgs, pri_pending_reply_error);
+	}
+
+	__ofono_gprs_provision_free_settings(pr->settings, pr->count);
+	g_free(pr);
+}
+
+static DBusMessage *pri_reset_async(struct pri_context *ctx, DBusMessage *msg,
+			struct ofono_gprs_provision_data *settings, int count,
+				const struct ofono_gprs_provision_data *ap)
+{
+	struct context_reset *pr;
+	struct ofono_gprs_context *gc = ctx->context_driver;
+
+	if (gc == NULL)
+		return __ofono_error_failed(msg);
+
+	pr = g_new0(struct context_reset, 1);
+	pr->msgs = g_slist_append(NULL, dbus_message_ref(msg));
+	pr->settings = settings;
+	pr->count = count;
+	pr->ap = ap;
+
+	ctx->pending_reset = pr;
+
+	/*
+	 * Context activation/deactivation or DeactivateAll may already
+	 * be in progress. In that case reset will complete once those
+	 * are done.
+	 */
+	if (!ctx->pending && !ctx->gprs->pending)
+		gc->driver->deactivate_primary(gc, ctx->context.cid,
+					pri_deactivate_callback, ctx);
+
+	return NULL;
+}
+
+static DBusMessage *pri_reset_properties(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct pri_context *ctx = data;
+	struct ofono_gprs *gprs = ctx->gprs;
+	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
+	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
+	struct ofono_gprs_provision_data *settings;
+	DBusMessage *reply = NULL;
+	int i, count = 0;
+
+	if (sim == NULL)
+		return __ofono_error_failed(msg);
+
+	if (ctx->pending_reset) {
+		ctx->pending_reset->msgs = g_slist_append(
+			ctx->pending_reset->msgs, dbus_message_ref(msg));
+		return NULL;
+	}
+
+	if (__ofono_gprs_provision_get_settings(ofono_sim_get_mcc(sim),
+				ofono_sim_get_mnc(sim), ofono_sim_get_spn(sim),
+						 &settings, &count) == FALSE)
+		return __ofono_error_failed(msg);
+
+	for (i = 0; i < count; i++) {
+		const struct ofono_gprs_provision_data *ap = settings + i;
+		if (ap->type == ctx->type && ap_valid(ap)) {
+			if (!(ctx->active || ctx->pending) ||
+					!pri_deactivation_required(ctx, ap)) {
+				/* Can do it right away */
+				pri_reset_context_properties(ctx, ap);
+				reply =  dbus_message_new_method_return(msg);
+				break;
+			}
+
+			/* Otherwise have to wait for context to deactivate */
+			reply = pri_reset_async(ctx, msg, settings, count, ap);
+			if (!reply)
+				return NULL;
+
+			break;
+		}
+	}
+
+	__ofono_gprs_provision_free_settings(settings, count);
+
+	return reply ? reply : __ofono_error_not_available(msg);
+}
+
 static void append_context_properties(struct pri_context *ctx,
 					DBusMessageIter *dict)
 {
@@ -909,6 +1171,7 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 					__ofono_error_failed(ctx->pending));
 		context_settings_free(ctx->context_driver->settings);
 		release_context(ctx);
+		pri_reset_finish(ctx, TRUE);
 		return;
 	}
 
@@ -934,6 +1197,11 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 	ofono_dbus_signal_property_changed(conn, ctx->path,
 					OFONO_CONNECTION_CONTEXT_INTERFACE,
 					"Active", DBUS_TYPE_BOOLEAN, &value);
+
+	/* Immediately deactivate if reset was requested */
+	if (ctx->pending_reset)
+		gc->driver->deactivate_primary(gc, ctx->context.cid,
+					pri_deactivate_callback, ctx);
 }
 
 static void pri_deactivate_callback(const struct ofono_error *error, void *data)
@@ -945,16 +1213,20 @@ static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Deactivating context failed with error: %s",
 				telephony_error_to_str(error));
-		__ofono_dbus_pending_reply(&ctx->pending,
+		pri_reset_finish(ctx, FALSE);
+		if (ctx->pending)
+			__ofono_dbus_pending_reply(&ctx->pending,
 					__ofono_error_failed(ctx->pending));
 		return;
 	}
 
-	__ofono_dbus_pending_reply(&ctx->pending,
+	if (ctx->pending)
+		__ofono_dbus_pending_reply(&ctx->pending,
 				dbus_message_new_method_return(ctx->pending));
 
 	pri_reset_context_settings(ctx);
 	release_context(ctx);
+	pri_reset_finish(ctx, TRUE);
 
 	value = ctx->active;
 	ofono_dbus_signal_property_changed(conn, ctx->path,
@@ -1226,7 +1498,7 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 		if (ctx->gprs->pending)
 			return __ofono_error_busy(msg);
 
-		if (ctx->pending)
+		if (ctx->pending || ctx->pending_reset)
 			return __ofono_error_busy(msg);
 
 		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
@@ -1337,6 +1609,8 @@ static const GDBusMethodTable context_methods[] = {
 	{ GDBUS_ASYNC_METHOD("SetProperty",
 			GDBUS_ARGS({ "property", "s" }, { "value", "v" }),
 			NULL, pri_set_property) },
+	{ GDBUS_ASYNC_METHOD("ResetProperties", NULL, NULL,
+			pri_reset_properties) },
 	{ }
 };
 
@@ -1374,6 +1648,7 @@ static void pri_context_destroy(gpointer userdata)
 {
 	struct pri_context *ctx = userdata;
 
+	pri_reset_finish(ctx, FALSE);
 	g_free(ctx->proxy_host);
 	g_free(ctx->path);
 	g_free(ctx);
@@ -1517,7 +1792,7 @@ static void release_active_contexts(struct ofono_gprs *gprs)
 			continue;
 
 		/* This context is already being messed with */
-		if (ctx->pending)
+		if (ctx->pending || ctx->pending_reset)
 			continue;
 
 		gc = ctx->context_driver;
@@ -1936,6 +2211,7 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 
 	pri_reset_context_settings(ctx);
 	release_context(ctx);
+	pri_reset_finish(ctx, FALSE);
 
 	value = FALSE;
 	ofono_dbus_signal_property_changed(conn, ctx->path,
@@ -1989,7 +2265,7 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 		struct ofono_gprs_context *gc = ctx->context_driver;
 
 		/* This context is already being messed with */
-		if (ctx->pending)
+		if (ctx->pending || ctx->pending_reset)
 			return __ofono_error_busy(msg);
 
 		gprs->pending = dbus_message_ref(msg);
@@ -2026,6 +2302,7 @@ static void gprs_deactivate_for_all(const struct ofono_error *error,
 	dbus_bool_t value;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		pri_reset_finish(ctx, FALSE);
 		__ofono_dbus_pending_reply(&gprs->pending,
 					__ofono_error_failed(gprs->pending));
 		return;
@@ -2033,6 +2310,7 @@ static void gprs_deactivate_for_all(const struct ofono_error *error,
 
 	pri_reset_context_settings(ctx);
 	release_context(ctx);
+	pri_reset_finish(ctx, TRUE);
 
 	value = ctx->active;
 	conn = ofono_dbus_get_connection();
@@ -2082,7 +2360,7 @@ static DBusMessage *gprs_deactivate_all(DBusConnection *conn,
 	for (l = gprs->contexts; l; l = l->next) {
 		ctx = l->data;
 
-		if (ctx->pending)
+		if (ctx->pending || ctx->pending_reset)
 			return __ofono_error_busy(msg);
 	}
 
@@ -2268,6 +2546,7 @@ static void gprs_context_unregister(struct ofono_atom *atom)
 
 		pri_reset_context_settings(ctx);
 		release_context(ctx);
+		pri_reset_finish(ctx, FALSE);
 
 		value = FALSE;
 		ofono_dbus_signal_property_changed(conn, ctx->path,
@@ -2339,6 +2618,7 @@ void ofono_gprs_context_deactivated(struct ofono_gprs_context *gc,
 
 		pri_reset_context_settings(ctx);
 		release_context(ctx);
+		pri_reset_finish(ctx, TRUE);
 
 		value = FALSE;
 		ofono_dbus_signal_property_changed(conn, ctx->path,
