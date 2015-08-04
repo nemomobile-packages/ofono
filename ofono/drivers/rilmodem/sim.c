@@ -422,7 +422,7 @@ static void ril_sim_read_record(struct ofono_sim *sim, int fileid,
 
 	g_ril_append_print_buf(sd->ril,
 				"(cmd=0x%.2X,efid=0x%.4X,",
-				CMD_GET_RESPONSE,
+				CMD_READ_RECORD,
 				fileid);
 
 	set_path(sd, &rilp, fileid, path, path_len);
