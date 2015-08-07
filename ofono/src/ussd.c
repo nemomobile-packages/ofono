@@ -559,7 +559,7 @@ static DBusMessage *ussd_initiate(DBusConnection *conn, DBusMessage *msg,
 	struct ofono_voicecall *vc;
 	gboolean call_in_progress;
 	const char *str;
-	int dcs = 0x0f;
+	int dcs;
 	unsigned char buf[160];
 	long num_packed;
 
@@ -588,7 +588,7 @@ static DBusMessage *ussd_initiate(DBusConnection *conn, DBusMessage *msg,
 	if (!valid_ussd_string(str, call_in_progress))
 		return __ofono_error_not_recognized(msg);
 
-	if (!ussd_encode(str, &num_packed, buf))
+	if (!ussd_dcs_encode(str,&dcs, &num_packed, buf))
 		return __ofono_error_invalid_format(msg);
 
 	if (ussd->driver->request == NULL)
@@ -629,7 +629,7 @@ static DBusMessage *ussd_respond(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_ussd *ussd = data;
 	const char *str;
-	int dcs = 0x0f;
+	int dcs;
 	unsigned char buf[160];
 	long num_packed;
 
@@ -646,7 +646,7 @@ static DBusMessage *ussd_respond(DBusConnection *conn, DBusMessage *msg,
 	if (strlen(str) == 0)
 		return __ofono_error_invalid_format(msg);
 
-	if (!ussd_encode(str, &num_packed, buf))
+	if (!ussd_dcs_encode(str,&dcs, &num_packed, buf))
 		return __ofono_error_invalid_format(msg);
 
 	if (ussd->driver->request == NULL)
