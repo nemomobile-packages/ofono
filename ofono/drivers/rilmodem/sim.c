@@ -76,6 +76,12 @@
 #define ENTER_SIM_PUK_PARAMS 3
 #define CHANGE_SIM_PIN_PARAMS 3
 
+/* Record Access Mode */
+#define GRIL_REC_ACCESS_MODE_CURRENT 0
+#define GRIL_REC_ACCESS_MODE_ABSOLUTE 1
+#define GRIL_REC_ACCESS_MODE_NEXT 2
+#define GRIL_REC_ACCESS_MODE_PREVIOUS 3
+
 /* Current SIM */
 static struct ofono_sim *current_sim;
 /* Current active app */
@@ -402,6 +408,155 @@ static void ril_sim_read_binary(struct ofono_sim *sim, int fileid,
 		g_free(cbd);
 		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
 	}
+}
+
+static void ril_sim_update_binary(struct ofono_sim *sim, int fileid,
+                    int start, int length,
+                    const unsigned char *value,
+                    const unsigned char *path,
+                    unsigned int path_len,
+                    ofono_sim_write_cb_t cb, void *data)
+{
+    struct sim_data *sd = ofono_sim_get_data(sim);
+    struct cb_data *cbd = cb_data_new(cb, data);
+    struct parcel rilp;
+    char *hex_data = NULL;
+    int p1 = 0, p2 = 0;
+    guint ret = 0;
+
+    DBG("file 0x%04x", fileid);
+
+    parcel_init(&rilp);
+    parcel_w_int32(&rilp, CMD_UPDATE_BINARY);
+    parcel_w_int32(&rilp, fileid);
+
+    g_ril_append_print_buf(sd->ril, "(cmd=0x%02X,efid=0x%04X,",
+                CMD_UPDATE_BINARY, fileid);
+
+        set_path(sd, &rilp, fileid, path, path_len);
+
+    p1 = start >> 8;
+    p2 = start & 0xff;
+    hex_data = encode_hex(data, length, 0);
+
+    parcel_w_int32(&rilp, p1);           /* P1 */
+    parcel_w_int32(&rilp, p2);           /* P2 */
+    parcel_w_int32(&rilp, length);       /* P3 (Lc) */
+    parcel_w_string(&rilp, hex_data);    /* data */
+    parcel_w_string(&rilp, NULL);        /* pin2; only for FDN/BDN */
+    parcel_w_string(&rilp, sd->aid_str); /* AID (Application ID) */
+
+    g_ril_append_print_buf(sd->ril,
+                "%s%d,%d,%d,%s,pin2=(null),aid=%s)",
+                print_buf,
+                p1,
+                p2,
+                length,
+                hex_data,
+                sd->aid_str);
+
+    g_free(hex_data);
+
+    ret = g_ril_send(sd->ril, RIL_REQUEST_SIM_IO, rilp.data,
+                rilp.size, ril_file_info_cb, cbd, g_free);
+
+    if (ret == 0) {
+        g_free(cbd);
+        CALLBACK_WITH_FAILURE(cb, cbd->data);
+    }
+}
+
+static int get_sim_record_access_p2(int mode)
+{
+    switch (mode) {
+    case GRIL_REC_ACCESS_MODE_CURRENT:
+        return 4;
+    case GRIL_REC_ACCESS_MODE_ABSOLUTE:
+        return 4;
+    case GRIL_REC_ACCESS_MODE_NEXT:
+        return 2;
+    case GRIL_REC_ACCESS_MODE_PREVIOUS:
+        return 3;
+    }
+
+    return -1;
+}
+
+static void update_record(struct ofono_sim *sim, int fileid,
+                int mode,
+                int record, int length,
+                const unsigned char *value,
+                const unsigned char *path,
+                unsigned int path_len,
+                ofono_sim_write_cb_t cb, void *data)
+{
+    struct sim_data *sd = ofono_sim_get_data(sim);
+    struct cb_data *cbd = cb_data_new(cb, data);
+    struct parcel rilp;
+    guint ret = 0;
+    char *hex_data;
+    int p2;
+
+    parcel_init(&rilp);
+    parcel_w_int32(&rilp, CMD_UPDATE_RECORD);
+    parcel_w_int32(&rilp, fileid);
+
+    g_ril_append_print_buf(sd->ril, "(cmd=0x%02X,efid=0x%04X,",
+                CMD_UPDATE_RECORD, fileid);
+
+    set_path(sd, &rilp, fileid,
+            path, path_len);
+
+    p2 = get_sim_record_access_p2(mode);
+    hex_data = encode_hex(data, length, 0);
+
+    parcel_w_int32(&rilp, record);        /* P1 */
+    parcel_w_int32(&rilp, p2);        /* P2 (access mode) */
+    parcel_w_int32(&rilp, length);        /* P3 (Lc) */
+    parcel_w_string(&rilp, hex_data);     /* data */
+    parcel_w_string(&rilp, NULL);         /* pin2; only for FDN/BDN */
+    parcel_w_string(&rilp, sd->aid_str);  /* AID (Application ID) */
+
+    g_ril_append_print_buf(sd->ril,
+                "%s%d,%d,%d,%s,pin2=(null),aid=%s)",
+                print_buf,
+                record,
+                p2,
+                length,
+                hex_data,
+                sd->aid_str);
+
+    g_free(hex_data);
+
+    ret = g_ril_send(sd->ril, RIL_REQUEST_SIM_IO, rilp.data,
+                rilp.size, ril_file_info_cb, cbd, g_free);
+
+    if (ret == 0) {
+        g_free(cbd);
+        CALLBACK_WITH_FAILURE(cb, data);
+    }
+}
+
+static void ril_sim_update_record(struct ofono_sim *sim, int fileid,
+                    int record, int length,
+                    const unsigned char *value,
+                    const unsigned char *path,
+                    unsigned int path_len,
+                    ofono_sim_write_cb_t cb, void *data)
+{
+    update_record(sim, fileid, GRIL_REC_ACCESS_MODE_ABSOLUTE, record,
+            length, value, path, path_len, cb, data);
+}
+
+static void ril_sim_update_cyclic(struct ofono_sim *sim, int fileid,
+                    int length, const unsigned char *value,
+                    const unsigned char *path,
+                    unsigned int path_len,
+                    ofono_sim_write_cb_t cb, void *data)
+{
+    /* Only mode valid for cyclic files is PREVIOUS */
+    update_record(sim, fileid, GRIL_REC_ACCESS_MODE_PREVIOUS, 0,
+            length, value, path, path_len, cb, data);
 }
 
 static void ril_sim_read_record(struct ofono_sim *sim, int fileid,
@@ -1205,6 +1360,9 @@ static struct ofono_sim_driver driver = {
 	.read_file_transparent	= ril_sim_read_binary,
 	.read_file_linear	= ril_sim_read_record,
 	.read_file_cyclic	= ril_sim_read_record,
+	.write_file_transparent = ril_sim_update_binary,
+	.write_file_linear  = ril_sim_update_record,
+	.write_file_cyclic  = ril_sim_update_cyclic,
 	.read_imsi		= ril_read_imsi,
 	.query_passwd_state	= ril_query_passwd_state,
 	.send_passwd		= ril_pin_send,
